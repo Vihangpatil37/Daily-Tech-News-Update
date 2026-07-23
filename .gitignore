@@ -1,0 +1,20 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.pytest_cache/
+
+# Project Data
+data/agent.db
+data/*.db
+logs/*.log
+logs/*.html
+
+# IDE
+.vscode/
+.idea/
