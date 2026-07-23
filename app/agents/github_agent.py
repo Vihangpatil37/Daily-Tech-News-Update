@@ -32,42 +32,58 @@ def fetch(lookback_hours: int = 24) -> List[RawItem]:
     if GITHUB_TOKEN:
         headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
 
-    # 1. Search recently created trending repositories
+    # 1. Scrape GitHub Trending Page
     try:
-        created_date_str = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
-        search_url = f"https://api.github.com/search/repositories?q=created:>{created_date_str}&sort=stars&order=desc&per_page=30"
-        
-        response = requests.get(search_url, headers=headers, timeout=10)
+        url = "https://github.com/trending"
+        html_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(url, headers=html_headers, timeout=15)
         if response.status_code == 200:
-            data = response.json()
-            for repo in data.get("items", []):
-                stars = float(repo.get("stargazers_count", 0))
-                if stars < MIN_STARS:
-                    continue
-
-                p_str = repo.get("created_at", "")
-                p_dt = datetime.fromisoformat(p_str.replace("Z", "+00:00")) if p_str else datetime.now(timezone.utc)
+            from bs4 import BeautifulSoup
+            import re
+            soup = BeautifulSoup(response.content, "html.parser")
+            articles = soup.find_all("article", class_="Box-row")
+            
+            for article in articles:
+                h2 = article.find("h2", class_="h3 lh-condensed")
+                if not h2: continue
+                a = h2.find("a")
+                if not a: continue
                 
-                if p_dt < cutoff_time:
+                repo_name = "".join(a.text.split())
+                repo_url = "https://github.com" + a["href"]
+                
+                p = article.find("p", class_="col-9 color-fg-muted my-1 pr-4")
+                description = p.text.strip() if p else "No description"
+                
+                # Extract stars today
+                stars_today_elem = article.find(string=re.compile(r'stars today'))
+                stars_today_str = stars_today_elem.parent.text.strip() if stars_today_elem else "0"
+                stars_today_num = int(re.sub(r'[^0-9]', '', stars_today_str) or 0)
+                
+                # Extract total stars
+                stars_a = article.find("a", href=re.compile(r'/stargazers'))
+                total_stars_str = stars_a.text.strip() if stars_a else "0"
+                
+                if stars_today_num < MIN_STARS:
                     continue
-
-                title = f"{repo.get('full_name')}: {repo.get('description') or 'No description'}"
-                url = repo.get("html_url", "")
-
+                
+                title = f"{repo_name}: {description}"
+                
                 raw_items.append(RawItem(
                     title=title,
-                    url=url,
+                    url=repo_url,
                     source="GitHub Trending",
-                    published_at=p_dt.isoformat(),
-                    raw_summary=f"Language: {repo.get('language') or 'N/A'}. Stars: {int(stars)}. Description: {repo.get('description', '')}",
-                    engagement_score=stars,
+                    published_at=datetime.now(timezone.utc).isoformat(),
+                    raw_summary=f"Trending today with {stars_today_num} new stars. Total stars: {total_stars_str}. Description: {description}",
+                    engagement_score=float(stars_today_num),
                     category_hint="GitHub Trending"
                 ))
         else:
-            logger.warning("GitHub repository search API returned status code %d: %s", response.status_code, response.text[:200])
-
+            logger.warning("GitHub trending page returned status code %d", response.status_code)
     except Exception as e:
-        logger.error("Error fetching trending GitHub repos: %s", e)
+        logger.error("Error scraping trending GitHub repos: %s", e)
 
     # 2. Check releases for watchlisted AI repos
     for repo_slug in WATCHLIST_REPOS:
