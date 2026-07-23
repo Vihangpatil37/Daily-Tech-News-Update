@@ -1,10 +1,9 @@
 services:
-  - type: cron
+  - type: web
     name: tech-agent-daily
     env: python
-    schedule: "0 2 * * *"   # 02:00 UTC = 07:30 AM IST — adjust as needed
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.scheduler_entry
+    startCommand: python -m app.web_entry
     envVars:
       - key: GEMINI_API_KEY
         sync: false
