@@ -1,0 +1,22 @@
+services:
+  - type: cron
+    name: tech-agent-daily
+    env: python
+    schedule: "0 2 * * *"   # 02:00 UTC = 07:30 AM IST — adjust as needed
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.scheduler_entry
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: RECIPIENT_EMAIL
+        sync: false
+    disk:
+      name: agent-data
+      mountPath: /opt/render/project/data
+      sizeGB: 1
