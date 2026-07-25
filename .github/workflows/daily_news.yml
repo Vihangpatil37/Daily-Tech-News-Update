@@ -1,0 +1,34 @@
+name: Daily Tech News Automation
+
+on:
+  schedule:
+    # Runs at 02:00 UTC (07:30 AM IST) every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allows you to run the action manually from the GitHub Actions tab
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      - name: Run Tech Agent Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
+        run: python -m app.main
