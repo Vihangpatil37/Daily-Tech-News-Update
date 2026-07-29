@@ -232,6 +232,10 @@
 
             <p class="item-summary">{{ item.summary }}</p>
 
+            <div class="item-detailed-analysis" style="font-size: 14.5px; color: #1e293b; margin-bottom: 12px; white-space: pre-wrap; line-height: 1.6;">
+              {{ item.detailed_analysis }}
+            </div>
+
             <div class="item-detail-block">
               <div><span class="detail-label">Why It Matters:</span> {{ item.why_it_matters }}</div>
               {% if item.developer_impact %}

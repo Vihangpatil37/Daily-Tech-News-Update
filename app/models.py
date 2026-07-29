@@ -30,6 +30,7 @@ class ProcessedItem:
     """Represents an item processed and summarized by the LLM."""
     headline: str
     summary: str
+    detailed_analysis: str
     why_it_matters: str
     developer_impact: str
     importance: str  # "Critical", "High", "Medium", or "Low"

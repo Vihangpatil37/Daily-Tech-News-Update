@@ -22,6 +22,7 @@ You are a senior tech intelligence analyst. Analyze this news item and return ON
 {{
   "headline": "concise headline, max 12 words",
   "summary": "2-3 sentences explaining what happened clearly",
+  "detailed_analysis": "A comprehensive 2-3 paragraph deep dive explaining the technical details, background, and implications.",
   "why_it_matters": "1-2 sentences on why this is significant for the tech industry",
   "developer_impact": "1-2 sentences on how software developers are affected or what action they should take",
   "importance": "Critical" | "High" | "Medium" | "Low",
@@ -41,6 +42,7 @@ Schema for each object in the JSON array:
 {{
   "headline": "concise headline, max 12 words",
   "summary": "2-3 sentences explaining what happened clearly",
+  "detailed_analysis": "A comprehensive 2-3 paragraph deep dive explaining the technical details, background, and implications.",
   "why_it_matters": "1-2 sentences on why this is significant for the tech industry",
   "developer_impact": "1-2 sentences on how software developers are affected or what action they should take",
   "importance": "Critical" | "High" | "Medium" | "Low",
@@ -215,6 +217,7 @@ def _build_processed_item_from_dict(data: dict, item: ConsolidatedItem) -> Proce
     return ProcessedItem(
         headline=data.get("headline", item.title[:80]),
         summary=data.get("summary", item.raw_summary[:200]),
+        detailed_analysis=data.get("detailed_analysis", "No detailed analysis provided."),
         why_it_matters=data.get("why_it_matters", "Significant update in tech."),
         developer_impact=data.get("developer_impact", "No immediate breaking changes identified."),
         importance=importance,
@@ -232,6 +235,7 @@ def _build_heuristic_fallback(item: ConsolidatedItem, reason: str) -> ProcessedI
     return ProcessedItem(
         headline=item.title[:80],
         summary=item.raw_summary[:200] or item.title,
+        detailed_analysis=item.raw_summary[:1000] or item.title,
         why_it_matters="Relevant update from top tech sources.",
         developer_impact="Review source details for technical specifications.",
         importance="High" if item.pre_score > 40 else "Medium",

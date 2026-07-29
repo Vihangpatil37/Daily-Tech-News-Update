@@ -2,8 +2,8 @@ name: Daily Tech News Automation
 
 on:
   schedule:
-    # Runs at 02:00 UTC (07:30 AM IST) every day
-    - cron: '0 2 * * *'
+    # Runs at 01:50 UTC (07:20 AM IST) every day to avoid GitHub top-of-hour delays
+    - cron: '50 1 * * *'
   workflow_dispatch:
     # Allows you to run the action manually from the GitHub Actions tab
 
@@ -24,6 +24,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
         
+      - name: Cache Database
+        uses: actions/cache@v3
+        with:
+          path: data/
+          key: tech-news-db-${{ github.run_id }}
+          restore-keys: |
+            tech-news-db-
+            
       - name: Run Tech Agent Pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
