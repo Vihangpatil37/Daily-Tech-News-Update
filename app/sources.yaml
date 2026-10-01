@@ -1,0 +1,13 @@
+rss_feeds:
+  - name: "Martin Fowler"
+    url: "https://martinfowler.com/feed.atom"
+    category_hint: "Software Architecture"
+  - name: "The Pragmatic Engineer"
+    url: "https://newsletter.pragmaticengineer.com/feed"
+    category_hint: "Engineering Leadership"
+  - name: "Google AI Blog"
+    url: "https://blog.research.google/atom.xml"
+    category_hint: "Artificial Intelligence"
+  - name: "OpenAI Blog"
+    url: "https://openai.com/blog/rss.xml"
+    category_hint: "Artificial Intelligence"

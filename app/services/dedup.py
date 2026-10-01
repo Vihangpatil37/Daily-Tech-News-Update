@@ -6,6 +6,7 @@ from typing import List, Dict
 from rapidfuzz import fuzz
 from app.models import RawItem, ConsolidatedItem
 from app.services import db
+from app.services import embeddings
 
 logger = logging.getLogger("tech-agent.dedup")
 
@@ -71,6 +72,15 @@ def deduplicate(items: List[RawItem], enable_cross_day: bool = True, lookback_da
             if norm_title and first_norm_title:
                 ratio = fuzz.token_sort_ratio(norm_title, first_norm_title)
                 if ratio >= 85:
+                    matched_cluster = cluster
+                    break
+
+            # Match criteria 3: Semantic similarity using embeddings
+            if item.title and first_item.title:
+                emb1 = embeddings.get_embedding(item.title)
+                emb2 = embeddings.get_embedding(first_item.title)
+                sim = embeddings.cosine_similarity(emb1, emb2)
+                if sim > 0.88:
                     matched_cluster = cluster
                     break
 

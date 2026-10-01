@@ -29,6 +29,21 @@ def init_db() -> None:
                     seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS historical_topics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    topic TEXT,
+                    frequency INTEGER,
+                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS historical_reports (
+                    id INTEGER PRIMARY KEY,
+                    created_at TEXT,
+                    html_content TEXT
+                )
+            """)
             conn.commit()
             logger.info("Database initialized successfully at %s", DATABASE_PATH)
     except Exception as e:

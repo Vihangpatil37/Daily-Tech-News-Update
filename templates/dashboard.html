@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        async function fetchSettings() {
+            const response = await fetch('/settings');
+            const text = await response.text();
+            document.getElementById('sources_text').value = text;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        async function runPipeline() {
+            await fetch('/run', { method: 'POST' });
+            alert('Pipeline started in background!');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-blue-600 text-white p-4 flex justify-between items-center shadow-md">
+        <div class="text-xl font-bold">Tech News Dashboard</div>
+        <div class="flex items-center space-x-4">
+            <form action="/research" method="GET" class="flex">
+                <input type="text" name="query" placeholder="Search..." class="px-2 py-1 text-black rounded-l-md outline-none">
+                <button type="submit" class="bg-blue-800 px-3 py-1 rounded-r-md hover:bg-blue-700">Search</button>
+            </form>
+            <button onclick="fetchSettings()" class="bg-gray-800 px-4 py-1 rounded hover:bg-gray-700">Settings</button>
+            <button onclick="runPipeline()" class="bg-green-600 px-4 py-1 rounded hover:bg-green-500">Run Pipeline</button>
+        </div>
+    </nav>
+
+    <main class="p-8 max-w-5xl mx-auto">
+        <div class="bg-white p-6 rounded shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 border-b pb-2">Latest Report</h2>
+            <div class="prose max-w-none">
+                {{ report_content | safe }}
+            </div>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-2xl">
+            <h3 class="text-xl font-bold mb-4">Edit Sources (sources.yaml)</h3>
+            <form action="/settings" method="POST">
+                <textarea id="sources_text" name="sources_text" class="w-full h-64 border p-2 mb-4 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-600" spellcheck="false"></textarea>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" onclick="closeSettings()" class="bg-gray-400 px-4 py-2 rounded hover:bg-gray-500 text-white">Cancel</button>
+                    <button type="submit" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 text-white">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

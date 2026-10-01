@@ -28,11 +28,12 @@ def main():
 
     validate_config(strict=False)
 
-    success = run_pipeline(
+    import asyncio
+    success = asyncio.run(run_pipeline(
         lookback_hours=args.lookback,
         dry_run=args.dry_run,
         recipient_override=args.recipient
-    )
+    ))
 
     if not success and not args.dry_run:
         print("[!] Pipeline completed with warnings/errors. Check logs for details.")

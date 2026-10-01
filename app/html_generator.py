@@ -21,7 +21,6 @@ def compute_reading_time(items_by_category: Dict[str, List[ProcessedItem]], exec
     minutes = max(1, round(word_count / 200))
     return minutes
 
-
 def render_email_html(
     date_str: str,
     executive_summary: str,
@@ -29,19 +28,49 @@ def render_email_html(
     learning_recommendation: Dict[str, Any],
     total_items_analyzed: int,
     active_source_count: int = 0,
-    active_sources_str: str = ""
+    active_sources_str: str = "",
+    detected_trends: List[str] = None
 ) -> str:
     """
     Renders the email HTML content using Jinja2 templates.
     """
     templates_dir = BASE_DIR / "templates"
     env = Environment(
-        loader=FileSystemLoader(str(templates_dir)),
         autoescape=select_autoescape(['html', 'xml'])
     )
 
-    template = env.get_template("email.html")
+    template_path = templates_dir / "email.html"
+    template_str = template_path.read_text(encoding="utf-8")
+
+    trends_html = ""
+    if detected_trends:
+        trends_html = '<div class="exec-summary-box" style="margin-top:20px; border-left-color: #f59e0b; background-color: #fffbeb;"><div class="exec-summary-title" style="color: #d97706;">📈 Surging Trends</div><ul style="margin:0; padding-left:20px;">'
+        for t in detected_trends:
+            trends_html += f'<li style="font-size: 15px; color: #334155;">{t}</li>'
+        trends_html += '</ul></div>'
+        
+    template_str = template_str.replace(
+        '<!-- Categorized News Sections -->',
+        f'{trends_html}\\n        <!-- Categorized News Sections -->'
+    )
+    
+    deep_dive_template = """
+              {{ item.detailed_analysis }}
+              {% if item.deep_dive_analysis %}
+              <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13.5px;">
+                <h4 style="margin: 0 0 8px 0; color: #334155; display: flex; align-items: center;">🔍 Deep Dive Analysis</h4>
+                <p style="margin: 0 0 6px 0;"><strong>Context:</strong> {{ item.deep_dive_analysis.historical_context }}</p>
+                <p style="margin: 0 0 6px 0;"><strong>Tech Impact:</strong> {{ item.deep_dive_analysis.technical_impact }}</p>
+                <p style="margin: 0 0 6px 0;"><strong>Business:</strong> {{ item.deep_dive_analysis.business_impact }}</p>
+                <p style="margin: 0;"><strong>Actionable:</strong> {{ item.deep_dive_analysis.actionable_takeaways }}</p>
+              </div>
+              {% endif %}
+"""
+    template_str = template_str.replace('{{ item.detailed_analysis }}', deep_dive_template)
+
+    template = env.from_string(template_str)
     reading_time = compute_reading_time(items_by_category, executive_summary)
+
 
     html_content = template.render(
         date_str=date_str,

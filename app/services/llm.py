@@ -65,7 +65,8 @@ Return ONLY valid JSON matching this exact schema:
     "topic": "Key technology/concept developers should study today based on these headlines",
     "reason": "Why this topic is important right now",
     "resources": ["Resource or search query 1", "Resource or search query 2"]
-  }}
+  }},
+  "detected_trends": ["Trend 1", "Trend 2", "Trend 3"]
 }}
 """
 
@@ -325,6 +326,21 @@ def summarize_items_batch(items: List[ConsolidatedItem]) -> List[ProcessedItem]:
     return results
 
 
+DEEP_DIVE_PROMPT = """
+You are a senior tech intelligence analyst. Provide a deep dive analysis for the following top news item.
+Return ONLY valid JSON matching this schema exactly:
+{{
+  "historical_context": "Context and background",
+  "technical_impact": "Impact on tech stack and architecture",
+  "business_impact": "Impact on business and market",
+  "actionable_takeaways": "What developers should do next"
+}}
+
+Headline: {headline}
+Summary: {summary}
+Detailed Analysis: {detailed_analysis}
+"""
+
 def batch_summarize_items(items: List[ConsolidatedItem], batch_size: int = 5) -> List[ProcessedItem]:
     """
     Splits items into batches of `batch_size` and processes each batch using `summarize_items_batch`.
@@ -334,10 +350,33 @@ def batch_summarize_items(items: List[ConsolidatedItem], batch_size: int = 5) ->
         chunk = items[i:i + batch_size]
         batch_results = summarize_items_batch(chunk)
         processed.extend(batch_results)
+        
+    critical_high_items = [item for item in processed if item.importance in ["Critical", "High"]]
+    top_3 = sorted(critical_high_items, key=lambda x: x.engagement_score, reverse=True)[:3]
+    
+    for item in top_3:
+        prompt = DEEP_DIVE_PROMPT.format(
+            headline=item.headline,
+            summary=item.summary,
+            detailed_analysis=item.detailed_analysis
+        )
+        raw_resp, reason = _call_gemini_api(prompt)
+        if raw_resp:
+            cleaned = _clean_json_response(raw_resp)
+            try:
+                data = json.loads(cleaned)
+                if isinstance(data, dict):
+                    item.deep_dive_analysis = data
+            except Exception as e:
+                logger.warning("Deep dive JSON parse failed for '%s': %s", item.headline, e)
+
     return processed
 
 
+last_detected_trends = []
+
 def generate_daily_briefing_meta(items: List[ProcessedItem]) -> Dict[str, Any]:
+    global last_detected_trends
     """
     Generates overall executive summary and learning recommendation for the daily email.
     """
@@ -366,13 +405,19 @@ def generate_daily_briefing_meta(items: List[ProcessedItem]) -> Dict[str, Any]:
     if not data or not isinstance(data, dict):
         top_headlines = [it.headline for it in items if it.importance in ["Critical", "High"]][:3]
         exec_summary = f"Today's briefing covers {len(items)} key developments across AI, research, and developer tools. Top stories include: {'; '.join(top_headlines)}."
-        return {
+        data = {
             "executive_summary": exec_summary,
             "learning_recommendation": {
                 "topic": "LLM Integration & AI Development",
                 "reason": "AI technologies continue to dominate top engineering developments today.",
                 "resources": ["Explore latest GitHub trending repos", "Review top arXiv papers"]
-            }
+            },
+            "detected_trends": []
         }
 
+    if "detected_trends" not in data:
+        data["detected_trends"] = []
+        
+    last_detected_trends = data["detected_trends"]
     return data
+

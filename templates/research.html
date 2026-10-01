@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Dive Research: {{ query }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <nav class="bg-blue-600 text-white shadow-md p-4">
+        <div class="container mx-auto flex items-center justify-between">
+            <h1 class="text-xl font-bold">Deep Dive Research</h1>
+            <a href="/" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Back to Dashboard
+            </a>
+        </div>
+    </nav>
+    <main class="container mx-auto p-4 mt-4">
+        <div class="bg-white rounded shadow p-6">
+            <h2 class="text-2xl font-bold mb-4">Research Query: {{ query }}</h2>
+            <div class="prose max-w-none">
+                {{ research_html | safe }}
+            </div>
+        </div>
+    </main>
+</body>
+</html>

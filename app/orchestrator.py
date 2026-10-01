@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -7,43 +8,61 @@ from collections import defaultdict
 
 from app.config import LOOKBACK_HOURS, TIMEZONE, BASE_DIR
 from app.models import RawItem, ConsolidatedItem, ProcessedItem
-from app.agents import AGENTS
+from app.collectors import get_all_collectors
 from app.services import db, dedup, ranking, llm, gmail
 from app import html_generator
 
 logger = logging.getLogger("tech-agent.orchestrator")
 
 
-def run_pipeline(lookback_hours: int = None, dry_run: bool = False, recipient_override: str = None) -> bool:
+async def run_pipeline(lookback_hours: int = None, dry_run: bool = False, recipient_override: str = None) -> bool:
     """
     Executes the complete Tech Intelligence AI Agent pipeline end-to-end.
     """
     hours = lookback_hours if lookback_hours is not None else LOOKBACK_HOURS
     logger.info("==================================================")
-    logger.info("Starting Tech Intelligence Pipeline (Lookback=%dh, DryRun=%s)", hours, dry_run)
+    logger.info("Starting Tech Intelligence Pipeline V2 (Lookback=%dh, DryRun=%s)", hours, dry_run)
     logger.info("==================================================")
 
     # 1. Initialize Database
     db.init_db()
 
-    # 2. Collection Stage
+    # 2. Collection Stage (Asynchronous)
     all_raw_items: List[RawItem] = []
     active_sources_set = set()
 
-    for agent in AGENTS:
-        agent_name = agent.__name__.split('.')[-1]
+    collectors = get_all_collectors()
+    if not collectors:
+        logger.error("No collectors found! Make sure they are defined in app/collectors/")
+        return False
+        
+    logger.info("Loaded %d collectors: %s", len(collectors), ", ".join(c.name for c in collectors))
+
+    async def fetch_from_collector(collector):
         try:
-            items = agent.fetch(lookback_hours=hours)
-            if items:
-                all_raw_items.extend(items)
-                for item in items:
-                    if item.source:
-                        active_sources_set.add(item.source)
-                logger.info("Agent %s returned %d items.", agent_name, len(items))
-            else:
-                logger.info("Agent %s returned 0 items.", agent_name)
+            items = await collector.fetch(lookback_hours=hours)
+            return collector.name, items
         except Exception as e:
-            logger.error("Unexpected error running agent %s: %s", agent_name, e)
+            logger.error("Unexpected error running collector %s: %s", collector.name, e)
+            return collector.name, []
+
+    # Run all collectors concurrently
+    fetch_tasks = [fetch_from_collector(c) for c in collectors]
+    results = await asyncio.gather(*fetch_tasks)
+
+    for collector_name, items in results:
+        if items:
+            all_raw_items.extend(items)
+            for item in items:
+                if item.source:
+                    active_sources_set.add(item.source)
+            logger.info("Collector %s returned %d items.", collector_name, len(items))
+        else:
+            logger.info("Collector %s returned 0 items.", collector_name)
+
+    # Ensure all collectors' HTTP clients are closed properly
+    close_tasks = [c.close() for c in collectors]
+    await asyncio.gather(*close_tasks)
 
     total_raw_count = len(all_raw_items)
     active_sources_list = sorted(list(active_sources_set))
@@ -57,7 +76,7 @@ def run_pipeline(lookback_hours: int = None, dry_run: bool = False, recipient_ov
         logger.warning("No items collected from any source. Pipeline stopping early.")
         return False
 
-    # 3. Deduplication Stage
+    # 3. Deduplication Stage (Synchronous/Blocking is fine here as it's quick DB work)
     consolidated_items = dedup.deduplicate(all_raw_items, enable_cross_day=True, lookback_days=7)
     if not consolidated_items:
         logger.info("No new items after deduplication. Nothing to send today.")
@@ -86,6 +105,9 @@ def run_pipeline(lookback_hours: int = None, dry_run: bool = False, recipient_ov
     exec_summary = meta.get("executive_summary", "")
     learning_rec = meta.get("learning_recommendation", {})
 
+    from app.services.trends import detect_trends
+    surging_trends = detect_trends(processed_items)
+
     date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
 
     # 7. HTML Rendering
@@ -96,10 +118,22 @@ def run_pipeline(lookback_hours: int = None, dry_run: bool = False, recipient_ov
         learning_recommendation=learning_rec,
         total_items_analyzed=total_raw_count,
         active_source_count=active_source_count,
-        active_sources_str=active_sources_str
+        active_sources_str=active_sources_str,
+        detected_trends=surging_trends
     )
 
     sent_urls_and_titles: List[Tuple[str, str]] = [(item.url, item.headline) for item in processed_items]
+
+    try:
+        with db.get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO historical_reports (created_at, html_content) VALUES (?, ?)",
+                (datetime.now(timezone.utc).isoformat(), html_content)
+            )
+            conn.commit()
+    except Exception as e:
+        logger.error("Failed to insert historical report: %s", e)
 
     # 8. Delivery or Preview
     if dry_run:
@@ -119,7 +153,6 @@ def run_pipeline(lookback_hours: int = None, dry_run: bool = False, recipient_ov
             recipient_override=recipient_override
         )
         if not success:
-            # Fallback save to preview.html if email delivery fails
             preview_dir = BASE_DIR / "logs"
             preview_dir.mkdir(parents=True, exist_ok=True)
             preview_path = preview_dir / "failed_send_preview.html"

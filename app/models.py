@@ -1,8 +1,7 @@
-from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
-@dataclass
-class RawItem:
+class RawItem(BaseModel):
     """Represents a single raw news item retrieved from a source agent."""
     title: str
     url: str
@@ -12,8 +11,7 @@ class RawItem:
     engagement_score: float = 0.0
     category_hint: Optional[str] = None
 
-@dataclass
-class ConsolidatedItem:
+class ConsolidatedItem(BaseModel):
     """Represents a merged item resulting from deduplication across sources."""
     id: str
     title: str
@@ -25,8 +23,7 @@ class ConsolidatedItem:
     category_hint: Optional[str] = None
     pre_score: float = 0.0
 
-@dataclass
-class ProcessedItem:
+class ProcessedItem(BaseModel):
     """Represents an item processed and summarized by the LLM."""
     headline: str
     summary: str
@@ -39,9 +36,9 @@ class ProcessedItem:
     sources: List[str]
     published_at: str
     engagement_score: float = 0.0
+    deep_dive_analysis: Optional[dict] = None
 
-@dataclass
-class DailyBriefing:
+class DailyBriefing(BaseModel):
     """Complete summary data for rendering the HTML email."""
     date_str: str
     executive_summary: str
@@ -49,3 +46,4 @@ class DailyBriefing:
     learning_recommendation: Dict[str, Any]  # {"topic": str, "reason": str, "resources": List[str]}
     estimated_reading_time: int  # in minutes
     total_items_analyzed: int
+    detected_trends: List[str] = []
